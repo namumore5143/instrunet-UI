@@ -1,29 +1,34 @@
 import numpy as np
-import pandas as pd
-import librosa.display
 import matplotlib.pyplot as plt
+import os
 
-# Load metadata
-df = pd.read_csv("processed/metadata.csv")
+BASE_DIR = "processed"
 
-# Pick ONE spectrogram file
-spec_path = df.iloc[0]["feature_path"]   # first sample
-print("Loading:", spec_path)
+sample_file = None
 
-# Load spectrogram (.npy)
-spec = np.load(spec_path)
+# Find the first .npy file in processed/
+for root, _, files in os.walk(BASE_DIR):
+    for f in files:
+        if f.endswith(".npy"):
+            sample_file = os.path.join(root, f)
+            break
+    if sample_file:
+        break
 
-# Plot
+if sample_file is None:
+    print("No .npy files found in processed/")
+    exit()
+
+print("Showing spectrogram from:", sample_file)
+
+spec = np.load(sample_file)
+
 plt.figure(figsize=(8, 4))
-librosa.display.specshow(
-    spec,
-    x_axis="time",
-    y_axis="mel",
-    cmap="magma"
-)
-plt.colorbar(format="%+2.0f dB")
+plt.imshow(spec, aspect="auto", origin="lower", cmap="magma")
+plt.colorbar(label="dB")
 plt.title("Log-Mel Spectrogram")
+plt.xlabel("Time")
+plt.ylabel("Mel bands")
 plt.tight_layout()
 plt.show()
-print(spec.shape)
-print(spec.min(), spec.max())
+

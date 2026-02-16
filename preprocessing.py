@@ -1,5 +1,5 @@
+print("RUNNING FILE:", __file__)
 import os
-import argparse
 from pathlib import Path
 
 import numpy as np
@@ -90,12 +90,10 @@ def process_file(
 # -------------------------------
 # Find audio files
 # -------------------------------
-def find_audio_files(data_dir, exts=None):
-    if exts is None:
-        exts = {".wav", ".WAV", ".mp3", ".flac"}
+def find_audio_files(data_dir):
     for root, _, files in os.walk(data_dir):
         for f in files:
-            if Path(f).suffix in exts:
+            if f.lower().endswith(".wav"):
                 yield os.path.join(root, f)
 
 
@@ -115,6 +113,7 @@ def process_dataset(
     rows = []
 
     files = list(find_audio_files(data_dir))
+
     for f in tqdm(files, desc="Processing audio"):
         out_path = process_file(
             f,
@@ -143,37 +142,20 @@ def process_dataset(
 
 
 # -------------------------------
-# CLI arguments
-# -------------------------------
-def parse_args():
-    p = argparse.ArgumentParser(
-        description="Preprocess IRMAS dataset into log-mel spectrograms"
-    )
-    p.add_argument("--data_dir", default="IRMAS-TrainingData/IRMAS-TrainingData")
-    p.add_argument("--out_dir", default="processed")
-    p.add_argument("--sr", type=int, default=22050)
-    p.add_argument("--duration", type=float, default=3.0)
-    p.add_argument("--n_fft", type=int, default=2048)
-    p.add_argument("--hop_length", type=int, default=512)
-    p.add_argument("--n_mels", type=int, default=128)
-    return p.parse_args()
-
-
-# -------------------------------
 # Main
 # -------------------------------
 if __name__ == "__main__":
-    args = parse_args()
+    DATASET_PATH = os.path.join(
+        os.getcwd(),
+        "IRMAS-TrainingData",
+        "IRMAS-TrainingData"
+    )
+
+    PROCESSED_PATH = os.path.join(os.getcwd(), "processed")
 
     meta = process_dataset(
-        data_dir=args.data_dir,
-        out_dir=args.out_dir,
-        sr=args.sr,
-        duration=args.duration,
-        n_fft=args.n_fft,
-        hop_length=args.hop_length,
-        n_mels=args.n_mels
+        data_dir=DATASET_PATH,
+        out_dir=PROCESSED_PATH
     )
 
     print("Wrote metadata:", meta)
-
