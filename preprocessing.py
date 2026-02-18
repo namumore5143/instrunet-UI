@@ -8,10 +8,6 @@ import librosa
 from tqdm import tqdm
 from pydub import AudioSegment, effects
 
-
-# -------------------------------
-# Feature extraction
-# -------------------------------
 def extract_log_mel_spectrogram(
     y,
     sr,
@@ -30,10 +26,6 @@ def extract_log_mel_spectrogram(
     log_mel = librosa.power_to_db(mel, ref=np.max)
     return log_mel.astype(np.float32)
 
-
-# -------------------------------
-# Process a single audio file
-# -------------------------------
 def process_file(
     path,
     out_dir,
@@ -48,10 +40,8 @@ def process_file(
     except Exception:
         return None
 
-    # Convert to mono & target sample rate
     audio = audio.set_channels(1).set_frame_rate(sr)
 
-    # Normalize loudness
     audio = effects.normalize(audio)
 
     # Convert to numpy float32 [-1, 1]
@@ -59,7 +49,6 @@ def process_file(
     max_val = float(2 ** (8 * audio.sample_width - 1))
     y = samples.astype(np.float32) / max_val
 
-    # Fixed-length trimming / padding
     desired_len = int(duration * sr)
     if len(y) < desired_len:
         y = np.pad(y, (0, desired_len - len(y)))
@@ -67,7 +56,6 @@ def process_file(
         start = (len(y) - desired_len) // 2
         y = y[start:start + desired_len]
 
-    # Extract log-mel spectrogram
     feat = extract_log_mel_spectrogram(
         y,
         sr,
@@ -76,7 +64,6 @@ def process_file(
         n_mels=n_mels
     )
 
-    # Save feature
     label = Path(path).parent.name
     label_dir = Path(out_dir) / label
     label_dir.mkdir(parents=True, exist_ok=True)
@@ -87,9 +74,6 @@ def process_file(
     return str(out_path)
 
 
-# -------------------------------
-# Find audio files
-# -------------------------------
 def find_audio_files(data_dir):
     for root, _, files in os.walk(data_dir):
         for f in files:
@@ -97,9 +81,6 @@ def find_audio_files(data_dir):
                 yield os.path.join(root, f)
 
 
-# -------------------------------
-# Process entire dataset
-# -------------------------------
 def process_dataset(
     data_dir,
     out_dir,
@@ -141,9 +122,6 @@ def process_dataset(
     return meta_path
 
 
-# -------------------------------
-# Main
-# -------------------------------
 if __name__ == "__main__":
     DATASET_PATH = os.path.join(
         os.getcwd(),
