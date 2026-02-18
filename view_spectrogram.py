@@ -6,7 +6,6 @@ BASE_DIR = "processed"
 
 sample_file = None
 
-# Find the first .npy file in processed/
 for root, _, files in os.walk(BASE_DIR):
     for f in files:
         if f.endswith(".npy"):
