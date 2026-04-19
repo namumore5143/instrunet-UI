@@ -1,3 +1,5 @@
+from os import path
+import cv2
 import streamlit as st
 import tensorflow as tf
 import librosa
@@ -22,7 +24,7 @@ st.set_page_config(
 )
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-MODEL_PATH = os.path.join(BASE_DIR, "models", "irmas_instrument_model.h5")
+MODEL_PATH = os.path.join(BASE_DIR, "models", "multilabel_instrument_model_FINAL.h5");
 
 INSTRUMENTS = ['cel', 'cla', 'flu', 'gac', 'gel', 'org', 'pia', 'sax', 'tru', 'vio', 'voi']
 FULL_NAMES = {
@@ -176,6 +178,9 @@ class InstrunetCoreV3:
     def __init__(self, path):
         self.model = self._load_model(path)
 
+        if self.model is not None:
+            print("MODEL INPUT SHAPE:", self.model.input_shape)
+
     @st.cache_resource
     def _load_model(_self, path):
         if os.path.exists(path):
@@ -183,32 +188,69 @@ class InstrunetCoreV3:
         return None
 
     def process_signal(self, path):
+        # 🎧 LOAD AUDIO
         y, sr = librosa.load(path, sr=22050, duration=15)
+
+        # 🔍 ONSET DETECTION
         onset_env = librosa.onset.onset_strength(y=y, sr=sr)
-        peaks = librosa.util.peak_pick(onset_env, pre_max=7, post_max=7, pre_avg=7, post_avg=7, delta=0.5, wait=30)
+        peaks = librosa.util.peak_pick(
+            onset_env,
+            pre_max=7, post_max=7,
+            pre_avg=7, post_avg=7,
+            delta=0.5, wait=30
+        )
+
         times = librosa.frames_to_time(peaks, sr=sr)
-        if len(times) == 0: times = [0.0]
-        
+        if len(times) == 0:
+            times = [0.0]
+
         features = []
+
+        # 🔁 PROCESS MULTIPLE CHUNKS
         for t in times[:10]:
             start = int(max(0, (t - 0.5) * sr))
-            chunk = y[start : start + int(3*sr)]
-            if len(chunk) < 3*sr: chunk = np.pad(chunk, (0, int(3*sr)-len(chunk)))
-            mfcc = librosa.feature.mfcc(y=chunk, sr=sr, n_mfcc=40).T
-            mfcc = mfcc[:130] if mfcc.shape[0] >= 130 else np.pad(mfcc, ((0, 130-mfcc.shape[0]), (0, 0)))
-            features.append(self.model.predict(mfcc.reshape(1, 130, 40, 1), verbose=0)[0])
+            chunk = y[start:start + int(3 * sr)]
 
+            # pad if too short
+            if len(chunk) < 3 * sr:
+                chunk = np.pad(chunk, (0, int(3 * sr) - len(chunk)))
+
+            # 🎼 MEL SPECTROGRAM (MATCH TRAINING)
+            spec = librosa.feature.melspectrogram(y=chunk, sr=sr, n_mels=128)
+            spec = librosa.power_to_db(spec, ref=np.max)
+            spec = cv2.resize(spec, (128, 128))
+            spec = (spec + 80) / 80   # scale from [-80, 0] → [0,1]
+            spec = spec.reshape(1, 128, 128, 1)
+
+            pred = self.model.predict(spec, verbose=0)[0]
+            features.append(pred)
+
+        # 📊 AGGREGATE PREDICTIONS
         avg_preds = np.mean(features, axis=0)
+        print(avg_preds)
+
+        # SINGLE BEST LABEL
         top_idx = np.argmax(avg_preds)
-        
+       
         return {
             "meta": {"id": datetime.now().strftime("%H:%M:%S")},
-            "result": {"label": FULL_NAMES[INSTRUMENTS[top_idx]], "conf": avg_preds[top_idx]},
-            "data": {"dist": {FULL_NAMES[INSTRUMENTS[i]]: float(avg_preds[i]) for i in range(len(INSTRUMENTS))}},
-            "signal": {"y": y, "sr": sr, "landmarks": times, "spec": librosa.feature.melspectrogram(y=y, sr=sr)}
+            "result": {
+                "label": FULL_NAMES[INSTRUMENTS[top_idx]],
+                "conf": float(avg_preds[top_idx])
+            },
+            "data": {
+                "dist": {
+                    FULL_NAMES[INSTRUMENTS[i]]: float(avg_preds[i])
+                    for i in range(len(INSTRUMENTS))
+                }
+            },
+            "signal": {
+                "y": y,
+                "sr": sr,
+                "landmarks": times,
+                "spec": librosa.feature.melspectrogram(y=y, sr=sr)
+            }
         }
-
-# ==========================================
 # 🖥️ PAGE ROUTING
 # ==========================================
 def render_home():
