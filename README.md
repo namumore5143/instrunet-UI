@@ -184,14 +184,6 @@ Model training can be executed via a dedicated training script (if included), us
 
 This project is licensed under the MIT License.
 
---
 
-14. Contributors
-
-* Nandini
-* Akilesh Prasad V
-* Namrata More
-* Nalam Venkata Surya Harshith
-* Sekar Bhuvana 
 
 ---
